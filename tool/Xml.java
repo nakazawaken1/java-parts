@@ -1,4 +1,8 @@
+package tool;
+
+import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -224,13 +228,29 @@ public class Xml {
     }
 
     /**
+     * XMLヘッダ生成
+     * @param version バージョン
+     * @param encode 文字コード
+     * @return XMLヘッダ
+     */
+    public static String header(String version, String encode) {
+        return "<?xml version=\"" + version + "\" encoding=\"" + encode + "\"?>\n";
+    }
+
+    /**
      * ヘッダつきでXML文字列化
      * @param version バージョン
      * @param encode 文字コード
+     * @param doctype DOCTYPE（ルート要素名より後から>の前までに記述する内容を指定)
      * @return XML文字列
      */
-    public String withHeader(String version, String encode) {
-        return "<?xml version=\"" + version + "\" encoding=\"" + encode + "\"?>\n" + this;
+    public String withHeader(String version, String encode, String doctype) {
+        String result = header(version, encode);
+        Xml root = this.root();
+        if(doctype != null) {
+            result += "<!DOCTYPE " + root.name + " " + doctype + ">\n";
+        }
+        return result + root;
     }
 
     /**
@@ -238,7 +258,42 @@ public class Xml {
      * @return XML文字列
      */
     public String withHeader() {
-        return withHeader("1.0", "UTF-8");
+        return withHeader("1.0", "UTF-8", null);
+    }
+
+    /**
+     * オブジェクトをXML文字列化
+     * @param o オブジェクト
+     * @return XML文字列
+     */
+    public static String toString(Object o) {
+        Class<?> c = o.getClass();
+        Xml xml = new Xml(c.getSimpleName());
+        Xml node = null;
+        for(Field field : c.getFields()) {
+            try {
+                if(node == null) {
+                    node = xml.child(field.getName(), field.get(o));
+                } else {
+                    node.next(field.getName(), field.get(o));
+                }
+            } catch (IllegalArgumentException | IllegalAccessException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+        return xml.toString();
+    }
+
+    /**
+     * オブジェクトをヘッダつきでXML文字列化
+     * @param o オブジェクト
+     * @param version バージョン
+     * @param encode 文字コード
+     * @return XML文字列
+     */
+    public static String withHeader(Object o, String version, String encode) {
+        return header(version, encode) + toString(o);
     }
 
     /**
@@ -266,11 +321,22 @@ public class Xml {
             id++;
         }
         Xml.indent = 1;
-        System.out.println(node.root().withHeader());
+        System.out.println(node.withHeader());
         System.out.println();
 
         // エスケープ文字の処理
         System.out.println(new Xml("root", "<エスケープ文字>の処理&").attr("id", "12\"34&").withHeader());
         System.out.println();
+
+        //オブジェクトをXML化
+        class Clas {
+            @SuppressWarnings("unused")
+            public int id = 123;
+            @SuppressWarnings("unused")
+            public String name = "オブジェクトをXML化";
+            @SuppressWarnings("unused")
+            public Date date = new Date();
+        }
+        System.out.println(Xml.toString(new Clas()));
     }
 }
